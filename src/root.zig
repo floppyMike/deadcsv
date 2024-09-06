@@ -138,3 +138,77 @@ test CSVReader {
         try std.testing.expectEqualDeep(Entry{ .a = "", .b = "" }, try csvReader.readEntry());
     }
 }
+
+/// Create a CSVWriter struct that specializes in writing a CSV string.
+pub fn CSVWriter(
+    /// Seperator to use
+    comptime sep: u8,
+    /// Entry type. All fields must have type `[]const u8`
+    EntryType: type,
+    /// Writer type for writing the csv
+    WriterType: type,
+) type {
+    return struct {
+        pub const header = buildHeader(EntryType, sep);
+
+        writer: WriterType,
+        line: u64,
+
+        /// Initializes a CSVWriter
+        pub fn init(
+            /// Writer instance for writing the csv
+            writer: WriterType,
+            /// If a header is included
+            includeHeader: bool,
+        ) !@This() {
+            var line: usize = 1;
+
+            if (includeHeader) {
+                try writer.writeAll(header);
+                try writer.writeByte('\n');
+                line += 1;
+            }
+
+            return .{ .writer = writer, .line = line };
+        }
+
+        /// Writes a CSV entry
+        pub fn writeEntry(
+            s: *@This(),
+            /// Entry to write
+            row: EntryType,
+        ) !void {
+            const rowInfo = @typeInfo(EntryType).Struct;
+            const rowFields = rowInfo.fields;
+
+            inline for (rowFields[0..(rowFields.len - 1)]) |field| {
+                try s.writer.writeAll(@field(row, field.name));
+                try s.writer.writeByte(sep);
+            }
+
+            try s.writer.writeAll(@field(row, rowFields[rowFields.len - 1].name));
+            try s.writer.writeByte('\n');
+
+            s.line += 1;
+        }
+    };
+}
+
+test CSVWriter {
+    {
+        var buffer: [64]u8 = undefined;
+        var bufferStream = std.io.fixedBufferStream(&buffer);
+        const bufferWriter = bufferStream.writer();
+
+        const Entry = struct {
+            a: []const u8,
+            b: []const u8,
+        };
+
+        var csvWriter = try CSVWriter(',', Entry, @TypeOf(bufferWriter)).init(bufferWriter, true);
+        try csvWriter.writeEntry(.{ .a = "1", .b = "2" });
+        try csvWriter.writeEntry(.{ .a = "", .b = "" });
+
+        try std.testing.expectEqualDeep("a,b\n1,2\n,\n", bufferStream.getWritten());
+    }
+}
