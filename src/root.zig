@@ -78,7 +78,7 @@ pub fn CSVReader(
         ///
         /// Returns:
         /// - A filled out entry of given EntryType
-        pub fn readEntry(s: *@This()) !EntryType {
+        pub fn readEntry(s: *@This()) !?EntryType {
             s.parseBuf.clearRetainingCapacity();
             s.line += 1;
 
@@ -87,6 +87,8 @@ pub fn CSVReader(
                 error.EndOfStream => {},
                 else => |e| return e,
             };
+
+            if (s.parseBuf.items.len == 0) return null;
 
             const entryInfo = @typeInfo(EntryType).Struct;
             const categories = entryInfo.fields;
@@ -138,6 +140,7 @@ test CSVReader {
 
         try std.testing.expectEqualDeep(Entry{ .a = "1", .b = "2" }, try csvReader.readEntry());
         try std.testing.expectEqualDeep(Entry{ .a = "", .b = "" }, try csvReader.readEntry());
+        try std.testing.expectEqualDeep(null, try csvReader.readEntry());
     }
 }
 
