@@ -50,11 +50,13 @@ pub fn CSVReader(
             alloc: std.mem.Allocator,
             /// Reader instance for reading the csv file
             reader: ReaderType,
+            // Buffer prealloc size (ex. 64 for 64 bytes)
+            prealloc: usize,
             /// If a header is included
             includeHeader: bool,
         ) !@This() {
             var parseBuf = std.ArrayList(u8).init(alloc);
-            try parseBuf.ensureTotalCapacity(128);
+            try parseBuf.ensureTotalCapacity(prealloc);
 
             var line: usize = 1;
 
@@ -131,7 +133,7 @@ test CSVReader {
             b: []const u8,
         };
 
-        var csvReader = try CSVReader(',', Entry, @TypeOf(bufferReader)).init(std.testing.allocator, bufferReader, true);
+        var csvReader = try CSVReader(',', Entry, @TypeOf(bufferReader)).init(std.testing.allocator, bufferReader, 64, true);
         defer csvReader.deinit();
 
         try std.testing.expectEqualDeep(Entry{ .a = "1", .b = "2" }, try csvReader.readEntry());
